@@ -95,15 +95,27 @@ def test_create_booking():
     assert response.json()["status"] == "PENDING"
 
 def test_payment():
-    # Login
-    login_response = client.post(
-        "/login",
+    payment_email = f"payment-{uuid.uuid4().hex}@example.com"
+
+    signup_response = client.post(
+        "/signup",
         json={
-            "email": TEST_EMAIL,
+            "name": "Payment Test User",
+            "email": payment_email,
             "password": "testpassword123"
         }
     )
 
+    assert signup_response.status_code == 200
+
+    # Login
+    login_response = client.post(
+        "/login",
+        json={
+            "email": payment_email,
+            "password": "testpassword123"
+        }
+    )
     token = login_response.json()["access_token"]
 
     # Create a booking for this user
@@ -130,13 +142,75 @@ def test_payment():
             "Authorization": f"Bearer {token}"
         },
         json={
-            "booking_id": booking_id
+            "booking_id": booking_id,
+            "status": "SUCCESS"
         }
     )
 
     assert response.status_code == 200
     assert response.json()["payment_status"] == "SUCCESS"
     assert response.json()["booking_status"] == "CONFIRMED"
+
+def test_failed_payment():
+    # Create a new user
+    failed_payment_email = f"failed-payment-{uuid.uuid4().hex}@example.com"
+
+    signup_response = client.post(
+        "/signup",
+        json={
+            "name": "Failed Payment User",
+            "email": failed_payment_email,
+            "password": "testpassword123"
+        }
+    )
+
+    assert signup_response.status_code == 200
+
+    # Login
+    login_response = client.post(
+        "/login",
+        json={
+            "email": failed_payment_email,
+            "password": "testpassword123"
+        }
+    )
+
+    assert login_response.status_code == 200
+
+    token = login_response.json()["access_token"]
+
+    # Create booking
+    booking_response = client.post(
+        "/bookings",
+        headers={
+            "Authorization": f"Bearer {token}"
+        },
+        json={
+            "test_id": 1,
+            "centre_id": 1,
+            "appointment_datetime": "2026-10-02T10:00:00"
+        }
+    )
+
+    assert booking_response.status_code == 200
+
+    booking_id = booking_response.json()["booking_id"]
+
+    # Make failed payment
+    response = client.post(
+        "/payments",
+        headers={
+            "Authorization": f"Bearer {token}"
+        },
+        json={
+            "booking_id": booking_id,
+            "status": "FAILED"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.json()["payment_status"] == "FAILED"
+    assert response.json()["booking_status"] == "FAILED"
 
 def test_payment_invalid_booking():
     login_response = client.post(
@@ -155,7 +229,8 @@ def test_payment_invalid_booking():
             "Authorization": f"Bearer {token}"
         },
         json={
-            "booking_id": 999999
+            "booking_id": 999999,
+            "status": "SUCCESS"
         }
     )
 
@@ -169,7 +244,7 @@ def test_payment_for_other_users_booking():
             "password": "testpassword123"
         }
     )
-
+    print("LOGIN RESPONSE:", login_response.status_code, login_response.json())
     token = login_response.json()["access_token"]
 
     response = client.post(
@@ -178,7 +253,8 @@ def test_payment_for_other_users_booking():
             "Authorization": f"Bearer {token}"
         },
         json={
-            "booking_id": 1
+            "booking_id": 1,
+            "status": "SUCCESS"
         }
     )
 

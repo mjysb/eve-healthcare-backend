@@ -247,14 +247,15 @@ def create_booking(
         "amount": new_booking.amount,
         "status": new_booking.status
     }
+
 @app.post("/payments")
 def create_payment(
-    payment: PaymentCreate,
+    payment_data: PaymentCreate,
     db: Session = Depends(get_db),
-    current_user_id: int = Depends(get_current_user)
+    current_user: int = Depends(get_current_user)
 ):
     booking = db.query(Booking).filter(
-        Booking.id == payment.booking_id
+        Booking.id == payment_data.booking_id
     ).first()
 
     if not booking:
@@ -263,10 +264,10 @@ def create_payment(
             detail="Booking not found"
         )
 
-    if booking.user_id != current_user_id:
+    if booking.user_id != current_user:
         raise HTTPException(
             status_code=403,
-            detail="You are not authorized to pay for this booking"
+            detail="Not authorized to pay for this booking"
         )
 
     if booking.status != "PENDING":
@@ -275,30 +276,36 @@ def create_payment(
             detail="Booking is not pending"
         )
 
-    # Simulate a successful payment
-    payment_status = "SUCCESS"
+    if payment_data.status not in ["SUCCESS", "FAILED"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid payment status"
+        )
 
-    new_payment = Payment(
+    payment = Payment(
         booking_id=booking.id,
         amount=booking.amount,
-        status=payment_status
+        status=payment_data.status
     )
 
-    db.add(new_payment)
+    db.add(payment)
 
-    booking.status = "CONFIRMED"
+    if payment_data.status == "SUCCESS":
+        booking.status = "CONFIRMED"
+    else:
+        booking.status = "FAILED"
 
     db.commit()
-    db.refresh(new_payment)
+    db.refresh(payment)
+    db.refresh(booking)
 
     return {
         "message": "Payment processed successfully",
-        "payment_id": new_payment.id,
-        "booking_id": booking.id,
-        "amount": new_payment.amount,
-        "payment_status": new_payment.status,
+        "payment_status": payment.status,
         "booking_status": booking.status
     }
+
+
 
 @app.post("/payments/webhook")
 def payment_webhook(

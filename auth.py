@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+import os
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -30,7 +31,7 @@ from models.user import User
 
 from passlib.context import CryptContext
 from jose import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -50,7 +51,10 @@ def verify_password(plain_password: str, hashed_password: str):
 
 # ---------------- JWT ----------------
 
-SECRET_KEY = "eve-healthcare-secret-key"
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "eve-healthcare-secret-key"
+)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -58,8 +62,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 def create_access_token(data: dict):
     to_encode = data.copy()
 
-    expire = datetime.utcnow() + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = datetime.now(timezone.utc) + timedelta(
+    minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     to_encode.update({"exp": expire})

@@ -769,12 +769,12 @@ The test suite currently covers:
 - Failed payment webhook
 - Invalid webhook status
 
-The current test suite contains **12 automated tests**.
+The current test suite contains **13 automated tests**.
 
 Expected result:
 
 ```text
-12 passed
+13 passed
 ```
 
 ---

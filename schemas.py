@@ -27,6 +27,7 @@ class BookingCreate(BaseModel):
       
 class PaymentCreate(BaseModel):
     booking_id: int
+    status: str
 
 class PaymentWebhook(BaseModel):
     event_id: str

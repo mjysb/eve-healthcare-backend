@@ -21,7 +21,8 @@ from schemas import (
     DiagnosticCentreCreate,
     DiagnosticTestCreate,
     BookingCreate,
-    PaymentCreate
+    PaymentCreate,
+    PaymentWebhook
 )
 from models.payment import Payment
 from models.booking import Booking
@@ -296,5 +297,68 @@ def create_payment(
         "booking_id": booking.id,
         "amount": new_payment.amount,
         "payment_status": new_payment.status,
+        "booking_status": booking.status
+    }
+
+@app.post("/payments/webhook")
+def payment_webhook(
+    webhook: PaymentWebhook,
+    db: Session = Depends(get_db)
+):
+
+    existing_payment = db.query(Payment).filter(
+        Payment.event_id == webhook.event_id
+    ).first()
+    
+    if existing_payment:
+        return {
+            "message": "Webhook already processed",
+            "booking_id": existing_payment.booking_id,
+            "booking_status": "ALREADY_PROCESSED"
+        }
+
+    
+    booking = db.query(Booking).filter(
+        Booking.id == webhook.booking_id
+    ).first()
+
+    if not booking:
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+    payment = db.query(Payment).filter(
+    Payment.booking_id == booking.id
+    ).first()
+
+    if payment:
+        payment.event_id = webhook.event_id
+    else:
+        payment = Payment(
+            booking_id=booking.id,
+            amount=booking.amount,
+            status=webhook.status,
+            event_id=webhook.event_id
+        )
+    db.add(payment)
+
+    if webhook.status == "SUCCESS":
+        booking.status = "CONFIRMED"
+
+    elif webhook.status == "FAILED":
+        booking.status = "FAILED"
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid payment status"
+        )
+
+    db.commit()
+    db.refresh(booking)
+
+    return {
+        "message": "Payment webhook processed",
+        "booking_id": booking.id,
         "booking_status": booking.status
     }

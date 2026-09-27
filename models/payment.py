@@ -25,6 +25,11 @@ class Payment(Base):
         nullable=False
     )
 
+    event_id = Column(
+    String(100),
+    unique=True,
+    nullable=True
+    )
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc)
